@@ -1,0 +1,48 @@
+name: "Build"
+
+on:
+  push:
+    branches:
+      - main  
+  
+jobs:
+  git-push:
+    runs-on: ubuntu-latest
+    name: git-push
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+        
+      - uses: addnab/docker-run-action@v3
+        with:
+            image: rafaelarcanjo/git-sftp:alpine-3.15-7.81.0_4
+            options: -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
+            run: |
+              (umask  077 ; echo "${{ secrets.SSH_PRIVATE_KEY }}" > ./id_rsa)
+              git config --global --add safe.directory `pwd`
+              git config git-ftp.url sftp://${{ vars.SERVER }}:${{ vars.PORT }}/${{ vars.FOLDER }}/
+              git config git-ftp.user ${{ vars.USERNAME }}
+              git config git-ftp.passphrase ${{ secrets.PASSPHRASE }}
+              git config git-ftp.privatekey ./id_rsa
+              git config git-ftp.syncroot .
+              git ftp push --key ./id_rsa --insecure --auto-init
+
+  docker-up:
+    runs-on: ubuntu-latest
+    name: docker-up
+    needs: git-push
+    steps:
+      - uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.SERVER }}
+          username: ${{ vars.USERNAME }}
+          port: ${{ vars.PORT }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          key: "${{ secrets.SSH_PRIVATE_KEY }}"
+          script_stop: true
+          script: |
+            cd ${{ vars.FOLDER }}
+            chmod +x conf/docker-entrypoint-custom.sh
+            docker-compose up -d

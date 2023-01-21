@@ -1,0 +1,45 @@
+version: '3.9'
+services:
+  db:
+    image: mariadb:10.3
+    restart: unless-stopped
+    volumes:
+      - database_volume:/var/lib/mysql
+
+  passbolt:
+    image: passbolt/passbolt:latest-ce
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      APP_FULL_BASE_URL_FILE: "${APP_FULL_BASE_URL_FILE}"
+      DATASOURCES_DEFAULT_HOST: "${DATASOURCES_DEFAULT_HOST}"
+      DATASOURCES_DEFAULT_USERNAME: "${DATASOURCES_DEFAULT_USERNAME}"
+      DATASOURCES_DEFAULT_PASSWORD: "${DATASOURCES_DEFAULT_PASSWORD}"
+      DATASOURCES_DEFAULT_DATABASE: "${DATASOURCES_DEFAULT_DATABASE}"
+      EMAIL_DEFAULT_FROM_NAME: "${EMAIL_DEFAULT_FROM_NAME}"
+      EMAIL_DEFAULT_FROM: "${EMAIL_DEFAULT_FROM}"
+      EMAIL_TRANSPORT_DEFAULT_HOST: "${EMAIL_TRANSPORT_DEFAULT_HOST}"
+      EMAIL_TRANSPORT_DEFAULT_PORT: "${EMAIL_TRANSPORT_DEFAULT_PORT}"
+      EMAIL_TRANSPORT_DEFAULT_USERNAME: "${EMAIL_TRANSPORT_DEFAULT_USERNAME}"
+      EMAIL_TRANSPORT_DEFAULT_PASSWORD: "${EMAIL_TRANSPORT_DEFAULT_PASSWORD}"
+      EMAIL_TRANSPORT_DEFAULT_TLS: ${EMAIL_TRANSPORT_DEFAULT_TLS}}
+    volumes:
+      - gpg_volume:/etc/passbolt/gpg
+      - jwt_volume:/etc/passbolt/jwt
+      - images:/usr/share/php/passbolt/webroot/img/public/images
+      - ./conf:/conf
+    command: ["/usr/bin/wait-for.sh", "-t", "0", "db:3306", "--", "/conf/docker-entrypoint-custom.sh"]
+    ports:
+      - 127.0.0.1:8080:80
+
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  database_volume:
+  gpg_volume:
+  jwt_volume:
+  images:
